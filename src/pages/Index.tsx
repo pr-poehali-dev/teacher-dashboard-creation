@@ -6,13 +6,18 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Calendar } from '@/components/ui/calendar';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Icon from '@/components/ui/icon';
 
 interface Student {
   id: number;
   name: string;
   class: string;
-  grades: number[];
+  grades: GradeEntry[];
   absences: { type: 'Н' | 'УП' | 'Б' | 'С'; count: number }[];
   average: number;
   isProblematic: boolean;
@@ -20,9 +25,11 @@ interface Student {
 }
 
 interface GradeEntry {
+  id: number;
   value: number;
   type: 'Домашняя работа' | 'Контрольная работа' | 'Самостоятельная работа';
   date: string;
+  subject: string;
 }
 
 const Index = () => {
@@ -31,22 +38,37 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedClass, setSelectedClass] = useState('9А');
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [isAddStudentOpen, setIsAddStudentOpen] = useState(false);
+  const [isAddGradeOpen, setIsAddGradeOpen] = useState(false);
+  const [selectedStudentForGrade, setSelectedStudentForGrade] = useState<number | null>(null);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+
+  // Form states
+  const [newStudentName, setNewStudentName] = useState('');
+  const [newStudentClass, setNewStudentClass] = useState('9А');
+  const [newStudentNotes, setNewStudentNotes] = useState('');
+  const [newGrade, setNewGrade] = useState(5);
+  const [newGradeType, setNewGradeType] = useState<'Домашняя работа' | 'Контрольная работа' | 'Самостоятельная работа'>('Домашняя работа');
 
   // Mock data
   const classes = ['9А', '9Б', '10А', '10Б', '11А'];
-  const students: Student[] = [
+  const [students, setStudents] = useState<Student[]>([
     {
       id: 1,
       name: 'Иванов Иван',
       class: '9А',
-      grades: [5, 4, 5, 3, 4],
+      grades: [
+        { id: 1, value: 5, type: 'Домашняя работа', date: '2024-07-20', subject: 'Математика' },
+        { id: 2, value: 4, type: 'Контрольная работа', date: '2024-07-22', subject: 'Математика' },
+        { id: 3, value: 5, type: 'Самостоятельная работа', date: '2024-07-24', subject: 'Математика' }
+      ],
       absences: [
         { type: 'Н', count: 2 },
         { type: 'УП', count: 1 },
         { type: 'Б', count: 3 },
         { type: 'С', count: 0 }
       ],
-      average: 4.2,
+      average: 4.7,
       isProblematic: false,
       notes: 'Хорошо подготовлен к урокам'
     },
@@ -54,14 +76,18 @@ const Index = () => {
       id: 2,
       name: 'Петрова София',
       class: '9А',
-      grades: [3, 2, 3, 3, 2],
+      grades: [
+        { id: 4, value: 3, type: 'Домашняя работа', date: '2024-07-20', subject: 'Математика' },
+        { id: 5, value: 2, type: 'Контрольная работа', date: '2024-07-22', subject: 'Математика' },
+        { id: 6, value: 3, type: 'Самостоятельная работа', date: '2024-07-24', subject: 'Математика' }
+      ],
       absences: [
         { type: 'Н', count: 5 },
         { type: 'УП', count: 0 },
         { type: 'Б', count: 1 },
         { type: 'С', count: 0 }
       ],
-      average: 2.6,
+      average: 2.7,
       isProblematic: true,
       notes: 'Требует дополнительного внимания'
     },
@@ -69,18 +95,22 @@ const Index = () => {
       id: 3,
       name: 'Сидоров Максим',
       class: '9Б',
-      grades: [5, 5, 4, 5, 5],
+      grades: [
+        { id: 7, value: 5, type: 'Домашняя работа', date: '2024-07-20', subject: 'Математика' },
+        { id: 8, value: 5, type: 'Контрольная работа', date: '2024-07-22', subject: 'Математика' },
+        { id: 9, value: 4, type: 'Самостоятельная работа', date: '2024-07-24', subject: 'Математика' }
+      ],
       absences: [
         { type: 'Н', count: 0 },
         { type: 'УП', count: 2 },
         { type: 'Б', count: 0 },
         { type: 'С', count: 1 }
       ],
-      average: 4.8,
+      average: 4.7,
       isProblematic: false,
       notes: 'Отличник, активно участвует'
     }
-  ];
+  ]);
 
   const handleLogin = () => {
     if (password === '123456789') {
@@ -90,11 +120,97 @@ const Index = () => {
     }
   };
 
+  const addStudent = () => {
+    if (!newStudentName.trim()) return;
+
+    const newStudent: Student = {
+      id: Date.now(),
+      name: newStudentName,
+      class: newStudentClass,
+      grades: [],
+      absences: [
+        { type: 'Н', count: 0 },
+        { type: 'УП', count: 0 },
+        { type: 'Б', count: 0 },
+        { type: 'С', count: 0 }
+      ],
+      average: 0,
+      isProblematic: false,
+      notes: newStudentNotes
+    };
+
+    setStudents([...students, newStudent]);
+    setNewStudentName('');
+    setNewStudentClass('9А');
+    setNewStudentNotes('');
+    setIsAddStudentOpen(false);
+  };
+
+  const deleteStudent = (studentId: number) => {
+    if (confirm('Вы уверены, что хотите удалить этого ученика?')) {
+      setStudents(students.filter(s => s.id !== studentId));
+    }
+  };
+
+  const addGrade = () => {
+    if (selectedStudentForGrade === null) return;
+
+    const newGradeEntry: GradeEntry = {
+      id: Date.now(),
+      value: newGrade,
+      type: newGradeType,
+      date: new Date().toISOString().split('T')[0],
+      subject: 'Математика'
+    };
+
+    setStudents(students.map(student => {
+      if (student.id === selectedStudentForGrade) {
+        const updatedGrades = [...student.grades, newGradeEntry];
+        const average = updatedGrades.reduce((sum, g) => sum + g.value, 0) / updatedGrades.length;
+        return {
+          ...student,
+          grades: updatedGrades,
+          average: Math.round(average * 10) / 10,
+          isProblematic: average < 3
+        };
+      }
+      return student;
+    }));
+
+    setIsAddGradeOpen(false);
+    setSelectedStudentForGrade(null);
+    setNewGrade(5);
+    setNewGradeType('Домашняя работа');
+  };
+
+  const removeGrade = (studentId: number, gradeId: number) => {
+    setStudents(students.map(student => {
+      if (student.id === studentId) {
+        const updatedGrades = student.grades.filter(g => g.id !== gradeId);
+        const average = updatedGrades.length > 0 
+          ? updatedGrades.reduce((sum, g) => sum + g.value, 0) / updatedGrades.length 
+          : 0;
+        return {
+          ...student,
+          grades: updatedGrades,
+          average: Math.round(average * 10) / 10,
+          isProblematic: average < 3 && average > 0
+        };
+      }
+      return student;
+    }));
+  };
+
+  const updateStudent = (updatedStudent: Student) => {
+    setStudents(students.map(s => s.id === updatedStudent.id ? updatedStudent : s));
+    setEditingStudent(null);
+  };
+
   const getGradeColor = (grade: number) => {
-    if (grade >= 5) return 'text-green-600';
-    if (grade >= 4) return 'text-blue-600';
-    if (grade >= 3) return 'text-yellow-600';
-    return 'text-red-600';
+    if (grade >= 5) return 'text-green-600 bg-green-100';
+    if (grade >= 4) return 'text-blue-600 bg-blue-100';
+    if (grade >= 3) return 'text-yellow-600 bg-yellow-100';
+    return 'text-red-600 bg-red-100';
   };
 
   const getAbsenceColor = (type: string) => {
@@ -146,8 +262,10 @@ const Index = () => {
   const filteredStudents = students.filter(student => student.class === selectedClass);
   const classStats = {
     totalStudents: filteredStudents.length,
-    averageGrade: filteredStudents.reduce((sum, s) => sum + s.average, 0) / filteredStudents.length,
-    problematicStudents: filteredStudents.filter(s => s.isProblematic).length
+    averageGrade: filteredStudents.length > 0 
+      ? filteredStudents.reduce((sum, s) => sum + s.average, 0) / filteredStudents.length 
+      : 0,
+    problematicStudients: filteredStudents.filter(s => s.isProblematic).length
   };
 
   return (
@@ -235,7 +353,10 @@ const Index = () => {
                     <div>
                       <p className="text-green-100">Средний балл</p>
                       <p className="text-3xl font-bold">
-                        {(students.reduce((sum, s) => sum + s.average, 0) / students.length).toFixed(1)}
+                        {students.length > 0 
+                          ? (students.reduce((sum, s) => sum + s.average, 0) / students.length).toFixed(1)
+                          : '0.0'
+                        }
                       </p>
                     </div>
                     <Icon name="TrendingUp" size={32} className="text-green-200" />
@@ -289,6 +410,9 @@ const Index = () => {
                         <Badge variant="destructive">Внимание</Badge>
                       </div>
                     ))}
+                    {students.filter(s => s.isProblematic).length === 0 && (
+                      <p className="text-center text-gray-500 py-4">Проблемных учеников нет</p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -336,10 +460,55 @@ const Index = () => {
                     <option key={cls} value={cls}>{cls}</option>
                   ))}
                 </select>
-                <Button className="bg-green-500 hover:bg-green-600">
-                  <Icon name="Plus" size={16} className="mr-2" />
-                  Добавить ученика
-                </Button>
+                <Dialog open={isAddStudentOpen} onOpenChange={setIsAddStudentOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="bg-green-500 hover:bg-green-600">
+                      <Icon name="Plus" size={16} className="mr-2" />
+                      Добавить ученика
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Добавить нового ученика</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="name">Имя ученика</Label>
+                        <Input
+                          id="name"
+                          value={newStudentName}
+                          onChange={(e) => setNewStudentName(e.target.value)}
+                          placeholder="Введите полное имя"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="class">Класс</Label>
+                        <Select value={newStudentClass} onValueChange={setNewStudentClass}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {classes.map(cls => (
+                              <SelectItem key={cls} value={cls}>{cls}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="notes">Заметки</Label>
+                        <Textarea
+                          id="notes"
+                          value={newStudentNotes}
+                          onChange={(e) => setNewStudentNotes(e.target.value)}
+                          placeholder="Дополнительная информация об ученике"
+                        />
+                      </div>
+                      <Button onClick={addStudent} className="w-full">
+                        Добавить ученика
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </div>
             </div>
 
@@ -367,7 +536,7 @@ const Index = () => {
                               <div className="flex items-center space-x-2">
                                 <span className="text-sm text-gray-600">Средний балл:</span>
                                 <Badge className={`${student.average >= 4 ? 'bg-green-100 text-green-800' : student.average >= 3 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
-                                  {student.average}
+                                  {student.average || '—'}
                                 </Badge>
                               </div>
                               <div className="flex items-center space-x-1">
@@ -380,17 +549,45 @@ const Index = () => {
                             </div>
                             <div className="mt-2 flex flex-wrap gap-1">
                               {student.grades.map((grade, idx) => (
-                                <span key={idx} className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold bg-gray-100 ${getGradeColor(grade)}`}>
-                                  {grade}
-                                </span>
+                                <div key={idx} className="relative group">
+                                  <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold ${getGradeColor(grade.value)} cursor-pointer`}>
+                                    {grade.value}
+                                  </span>
+                                  <button
+                                    onClick={() => removeGrade(student.id, grade.id)}
+                                    className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
                               ))}
+                              <button
+                                onClick={() => {setSelectedStudentForGrade(student.id); setIsAddGradeOpen(true);}}
+                                className="inline-flex items-center justify-center w-8 h-8 rounded-full border-2 border-dashed border-gray-300 text-gray-500 hover:border-blue-500 hover:text-blue-500"
+                              >
+                                +
+                              </button>
                             </div>
+                            {student.notes && (
+                              <div className="mt-2 text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                                {student.notes}
+                              </div>
+                            )}
                           </div>
                           <div className="flex items-center space-x-2">
-                            <Button variant="outline" size="sm">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => setEditingStudent(student)}
+                            >
                               <Icon name="Edit" size={16} />
                             </Button>
-                            <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="text-red-600 hover:text-red-700"
+                              onClick={() => deleteStudent(student.id)}
+                            >
                               <Icon name="Trash2" size={16} />
                             </Button>
                           </div>
@@ -417,12 +614,12 @@ const Index = () => {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm text-gray-600">Проблемные</span>
-                      <span className="font-semibold text-red-600">{classStats.problematicStudents}</span>
+                      <span className="font-semibold text-red-600">{classStats.problematicStudients}</span>
                     </div>
                   </div>
                   <div className="pt-4 border-t">
                     <h4 className="font-medium mb-2">Успеваемость</h4>
-                    <Progress value={(classStats.averageGrade / 5) * 100} className="h-2" />
+                    <Progress value={classStats.totalStudents > 0 ? (classStats.averageGrade / 5) * 100 : 0} className="h-2" />
                   </div>
                 </CardContent>
               </Card>
@@ -431,19 +628,84 @@ const Index = () => {
 
           {/* Journal */}
           <TabsContent value="journal" className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-gray-900">Электронный журнал</h2>
+              <div className="flex items-center space-x-4">
+                <select 
+                  value={selectedClass} 
+                  onChange={(e) => setSelectedClass(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  {classes.map(cls => (
+                    <option key={cls} value={cls}>{cls}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Icon name="BookOpen" size={20} />
-                  <span>Электронный журнал</span>
-                </CardTitle>
+                <CardTitle>Журнал класса {selectedClass}</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-12">
-                  <Icon name="BookOpen" size={64} className="mx-auto text-gray-300 mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Журнал в разработке</h3>
-                  <p className="text-gray-600">Здесь будет система выставления оценок</p>
-                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Ученик</TableHead>
+                      <TableHead>Средний балл</TableHead>
+                      <TableHead>Последние оценки</TableHead>
+                      <TableHead>Пропуски</TableHead>
+                      <TableHead>Действия</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredStudents.map(student => (
+                      <TableRow key={student.id} className={student.isProblematic ? 'bg-red-50' : ''}>
+                        <TableCell className="font-medium">{student.name}</TableCell>
+                        <TableCell>
+                          <Badge className={`${student.average >= 4 ? 'bg-green-100 text-green-800' : student.average >= 3 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
+                            {student.average || '—'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex space-x-1">
+                            {student.grades.slice(-5).map((grade, idx) => (
+                              <span key={idx} className={`inline-flex items-center justify-center w-6 h-6 rounded text-xs font-semibold ${getGradeColor(grade.value)}`}>
+                                {grade.value}
+                              </span>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex space-x-1">
+                            {student.absences.map((absence, idx) => (
+                              absence.count > 0 && (
+                                <Badge key={idx} variant="outline" className={`text-xs ${getAbsenceColor(absence.type)}`}>
+                                  {absence.type}: {absence.count}
+                                </Badge>
+                              )
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Button 
+                            size="sm" 
+                            onClick={() => {setSelectedStudentForGrade(student.id); setIsAddGradeOpen(true);}}
+                          >
+                            <Icon name="Plus" size={14} className="mr-1" />
+                            Оценка
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {filteredStudents.length === 0 && (
+                  <div className="text-center py-8">
+                    <Icon name="BookOpen" size={48} className="mx-auto text-gray-300 mb-4" />
+                    <p className="text-gray-500">В этом классе пока нет учеников</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -580,14 +842,14 @@ const Index = () => {
                   <div className="space-y-3">
                     {[5, 4, 3, 2].map(grade => {
                       const count = students.reduce((sum, student) => 
-                        sum + student.grades.filter(g => g === grade).length, 0
+                        sum + student.grades.filter(g => g.value === grade).length, 0
                       );
                       const total = students.reduce((sum, student) => sum + student.grades.length, 0);
                       const percentage = total > 0 ? (count / total) * 100 : 0;
                       
                       return (
                         <div key={grade} className="flex items-center space-x-3">
-                          <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${getGradeColor(grade)} bg-gray-100`}>
+                          <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${getGradeColor(grade)}`}>
                             {grade}
                           </span>
                           <div className="flex-1">
@@ -623,6 +885,95 @@ const Index = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Add Grade Dialog */}
+      <Dialog open={isAddGradeOpen} onOpenChange={setIsAddGradeOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Добавить оценку</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="grade">Оценка</Label>
+              <Select value={newGrade.toString()} onValueChange={(value) => setNewGrade(parseInt(value))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="5">5 (Отлично)</SelectItem>
+                  <SelectItem value="4">4 (Хорошо)</SelectItem>
+                  <SelectItem value="3">3 (Удовлетворительно)</SelectItem>
+                  <SelectItem value="2">2 (Неудовлетворительно)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="gradeType">Тип работы</Label>
+              <Select value={newGradeType} onValueChange={setNewGradeType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Домашняя работа">Домашняя работа</SelectItem>
+                  <SelectItem value="Контрольная работа">Контрольная работа</SelectItem>
+                  <SelectItem value="Самостоятельная работа">Самостоятельная работа</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={addGrade} className="w-full">
+              Добавить оценку
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Student Dialog */}
+      {editingStudent && (
+        <Dialog open={!!editingStudent} onOpenChange={() => setEditingStudent(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Редактировать ученика</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="editName">Имя ученика</Label>
+                <Input
+                  id="editName"
+                  value={editingStudent.name}
+                  onChange={(e) => setEditingStudent({...editingStudent, name: e.target.value})}
+                />
+              </div>
+              <div>
+                <Label htmlFor="editClass">Класс</Label>
+                <Select 
+                  value={editingStudent.class} 
+                  onValueChange={(value) => setEditingStudent({...editingStudent, class: value})}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {classes.map(cls => (
+                      <SelectItem key={cls} value={cls}>{cls}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="editNotes">Заметки</Label>
+                <Textarea
+                  id="editNotes"
+                  value={editingStudent.notes}
+                  onChange={(e) => setEditingStudent({...editingStudent, notes: e.target.value})}
+                />
+              </div>
+              <Button onClick={() => updateStudent(editingStudent)} className="w-full">
+                Сохранить изменения
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };
