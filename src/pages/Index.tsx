@@ -42,6 +42,10 @@ const Index = () => {
   const [isAddGradeOpen, setIsAddGradeOpen] = useState(false);
   const [selectedStudentForGrade, setSelectedStudentForGrade] = useState<number | null>(null);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [isAddAbsenceOpen, setIsAddAbsenceOpen] = useState(false);
+  const [selectedStudentForAbsence, setSelectedStudentForAbsence] = useState<number | null>(null);
+  const [newAbsenceType, setNewAbsenceType] = useState<'Н' | 'УП' | 'Б' | 'С'>('Н');
+  const [newAbsenceReason, setNewAbsenceReason] = useState('');
 
   // Form states
   const [newStudentName, setNewStudentName] = useState('');
@@ -49,6 +53,12 @@ const Index = () => {
   const [newStudentNotes, setNewStudentNotes] = useState('');
   const [newGrade, setNewGrade] = useState(5);
   const [newGradeType, setNewGradeType] = useState<'Домашняя работа' | 'Контрольная работа' | 'Самостоятельная работа'>('Домашняя работа');
+
+  // Constructor states
+  const [selectedSubject, setSelectedSubject] = useState('Математика');
+  const [selectedTopic, setSelectedTopic] = useState('');
+  const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
+  const [generatedTest, setGeneratedTest] = useState<string>('');
 
   // Mock data
   const classes = ['9А', '9Б', '10А', '10Б', '11А'];
@@ -204,6 +214,115 @@ const Index = () => {
   const updateStudent = (updatedStudent: Student) => {
     setStudents(students.map(s => s.id === updatedStudent.id ? updatedStudent : s));
     setEditingStudent(null);
+  };
+
+  const addAbsence = () => {
+    if (selectedStudentForAbsence === null) return;
+
+    setStudents(students.map(student => {
+      if (student.id === selectedStudentForAbsence) {
+        const updatedAbsences = student.absences.map(absence => 
+          absence.type === newAbsenceType 
+            ? { ...absence, count: absence.count + 1 }
+            : absence
+        );
+        return { ...student, absences: updatedAbsences };
+      }
+      return student;
+    }));
+
+    setIsAddAbsenceOpen(false);
+    setSelectedStudentForAbsence(null);
+    setNewAbsenceType('Н');
+    setNewAbsenceReason('');
+  };
+
+  const exportToPDF = (type: 'class' | 'individual', studentId?: number) => {
+    let content = '';
+    
+    if (type === 'class') {
+      const classStudents = students.filter(s => s.class === selectedClass);
+      content = `Отчет по классу ${selectedClass}\n\n`;
+      
+      classStudents.forEach(student => {
+        content += `${student.name}:\n`;
+        content += `- Средний балл: ${student.average}\n`;
+        content += `- Оценки: ${student.grades.map(g => g.value).join(', ')}\n`;
+        content += `- Пропуски: ${student.absences.map(a => `${a.type}: ${a.count}`).join(', ')}\n\n`;
+      });
+    } else if (type === 'individual' && studentId) {
+      const student = students.find(s => s.id === studentId);
+      if (student) {
+        content = `Отчет по ученику: ${student.name}\n\n`;
+        content += `Класс: ${student.class}\n`;
+        content += `Средний балл: ${student.average}\n\n`;
+        content += `Оценки:\n`;
+        student.grades.forEach(grade => {
+          content += `- ${grade.value} (${grade.type}) - ${grade.date}\n`;
+        });
+        content += `\nПропуски:\n`;
+        student.absences.forEach(absence => {
+          if (absence.count > 0) {
+            content += `- ${absence.type}: ${absence.count}\n`;
+          }
+        });
+        if (student.notes) {
+          content += `\nЗаметки: ${student.notes}\n`;
+        }
+      }
+    }
+    
+    // Создаем блоб и скачиваем
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = type === 'class' ? `Отчет_${selectedClass}.txt` : `Отчет_${students.find(s => s.id === studentId)?.name}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const generateTest = () => {
+    const subjects = {
+      'Математика': {
+        'Алгебра': [
+          'Решите уравнение: 2x + 5 = 13',
+          'Найдите корни уравнения: x² - 4x + 3 = 0',
+          'Упростите выражение: (x + 2)(x - 3)'
+        ],
+        'Геометрия': [
+          'Найдите площадь треугольника со сторонами 3, 4, 5',
+          'Вычислите периметр прямоугольника 12x8 см',
+          'Найдите угол в равностороннем треугольнике'
+        ]
+      },
+      'Русский язык': {
+        'Орфография': [
+          'Вставьте пропущенные буквы: пр....красный',
+          'Поставьте ударение в слове: звонит',
+          'Определите часть речи: быстро'
+        ],
+        'Пунктуация': [
+          'Расставьте знаки препинания в предложении',
+          'Объясните постановку запятых',
+          'Поставьте тире в предложении'
+        ]
+      }
+    };
+
+    if (selectedTopic && selectedTasks.length > 0) {
+      let test = `КОНТРОЛЬНАЯ РАБОТА\n`;
+      test += `Предмет: ${selectedSubject}\n`;
+      test += `Тема: ${selectedTopic}\n\n`;
+      
+      selectedTasks.forEach((task, index) => {
+        test += `${index + 1}. ${task}\n\n`;
+      });
+      
+      setGeneratedTest(test);
+    }
   };
 
   const getGradeColor = (grade: number) => {
@@ -545,6 +664,29 @@ const Index = () => {
                                     {absence.type}: {absence.count}
                                   </Badge>
                                 ))}
+                                <div className="flex space-x-1 ml-2">
+                                  {['Н', 'УП', 'Б', 'С'].map(type => (
+                                    <button
+                                      key={type}
+                                      onClick={() => {
+                                        setStudents(students.map(s => {
+                                          if (s.id === student.id) {
+                                            const updatedAbsences = s.absences.map(absence => 
+                                              absence.type === type 
+                                                ? { ...absence, count: absence.count + 1 }
+                                                : absence
+                                            );
+                                            return { ...s, absences: updatedAbsences };
+                                          }
+                                          return s;
+                                        }));
+                                      }}
+                                      className={`w-6 h-6 rounded text-xs font-bold border hover:scale-110 transition-transform ${getAbsenceColor(type)} border-current`}
+                                    >
+                                      {type}
+                                    </button>
+                                  ))}
+                                </div>
                               </div>
                             </div>
                             <div className="mt-2 flex flex-wrap gap-1">
@@ -688,13 +830,23 @@ const Index = () => {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Button 
-                            size="sm" 
-                            onClick={() => {setSelectedStudentForGrade(student.id); setIsAddGradeOpen(true);}}
-                          >
-                            <Icon name="Plus" size={14} className="mr-1" />
-                            Оценка
-                          </Button>
+                          <div className="flex space-x-2">
+                            <Button 
+                              size="sm" 
+                              onClick={() => {setSelectedStudentForGrade(student.id); setIsAddGradeOpen(true);}}
+                            >
+                              <Icon name="Plus" size={14} className="mr-1" />
+                              Оценка
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => {setSelectedStudentForAbsence(student.id); setIsAddAbsenceOpen(true);}}
+                            >
+                              <Icon name="Calendar" size={14} className="mr-1" />
+                              Пропуск
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -724,18 +876,33 @@ const Index = () => {
                   <div className="p-4 border rounded-lg">
                     <h3 className="font-semibold mb-2">Отчет по классу</h3>
                     <p className="text-sm text-gray-600 mb-4">Экспорт успеваемости класса в PDF</p>
-                    <Button className="w-full">
+                    <Button 
+                      className="w-full"
+                      onClick={() => exportToPDF('class')}
+                    >
                       <Icon name="Download" size={16} className="mr-2" />
-                      Скачать PDF
+                      Скачать отчет
                     </Button>
                   </div>
                   <div className="p-4 border rounded-lg">
                     <h3 className="font-semibold mb-2">Индивидуальные отчеты</h3>
                     <p className="text-sm text-gray-600 mb-4">Отчеты по каждому ученику</p>
-                    <Button className="w-full" variant="outline">
-                      <Icon name="FileText" size={16} className="mr-2" />
-                      Создать отчеты
-                    </Button>
+                    <div className="space-y-2">
+                      {filteredStudents.map(student => (
+                        <Button 
+                          key={student.id}
+                          className="w-full text-xs" 
+                          variant="outline"
+                          onClick={() => exportToPDF('individual', student.id)}
+                        >
+                          <Icon name="FileText" size={14} className="mr-1" />
+                          {student.name}
+                        </Button>
+                      ))}
+                      {filteredStudents.length === 0 && (
+                        <p className="text-sm text-gray-500 text-center">Выберите класс с учениками</p>
+                      )}
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -790,21 +957,165 @@ const Index = () => {
 
           {/* Constructor */}
           <TabsContent value="constructor" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Icon name="Settings" size={20} />
-                  <span>Конструктор контрольных работ</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-12">
-                  <Icon name="Settings" size={64} className="mx-auto text-gray-300 mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Конструктор в разработке</h3>
-                  <p className="text-gray-600">Здесь будет система создания контрольных работ</p>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Icon name="Settings" size={20} />
+                    <span>Конструктор контрольных работ</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label>Предмет</Label>
+                    <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Математика">Математика</SelectItem>
+                        <SelectItem value="Русский язык">Русский язык</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label>Тема</Label>
+                    <Select value={selectedTopic} onValueChange={setSelectedTopic}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Выберите тему" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {selectedSubject === 'Математика' && (
+                          <>
+                            <SelectItem value="Алгебра">Алгебра</SelectItem>
+                            <SelectItem value="Геометрия">Геометрия</SelectItem>
+                          </>
+                        )}
+                        {selectedSubject === 'Русский язык' && (
+                          <>
+                            <SelectItem value="Орфография">Орфография</SelectItem>
+                            <SelectItem value="Пунктуация">Пунктуация</SelectItem>
+                          </>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {selectedTopic && (
+                    <div>
+                      <Label>Доступные задания</Label>
+                      <div className="space-y-2 max-h-40 overflow-y-auto">
+                        {(() => {
+                          const subjects = {
+                            'Математика': {
+                              'Алгебра': [
+                                'Решите уравнение: 2x + 5 = 13',
+                                'Найдите корни уравнения: x² - 4x + 3 = 0',
+                                'Упростите выражение: (x + 2)(x - 3)'
+                              ],
+                              'Геометрия': [
+                                'Найдите площадь треугольника со сторонами 3, 4, 5',
+                                'Вычислите периметр прямоугольника 12x8 см',
+                                'Найдите угол в равностороннем треугольнике'
+                              ]
+                            },
+                            'Русский язык': {
+                              'Орфография': [
+                                'Вставьте пропущенные буквы: пр....красный',
+                                'Поставьте ударение в слове: звонит',
+                                'Определите часть речи: быстро'
+                              ],
+                              'Пунктуация': [
+                                'Расставьте знаки препинания в предложении',
+                                'Объясните постановку запятых',
+                                'Поставьте тире в предложении'
+                              ]
+                            }
+                          };
+                          return subjects[selectedSubject as keyof typeof subjects]?.[selectedTopic as keyof typeof subjects[typeof selectedSubject]]?.map((task, index) => (
+                            <div key={index} className="flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                id={`task-${index}`}
+                                checked={selectedTasks.includes(task)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedTasks([...selectedTasks, task]);
+                                  } else {
+                                    setSelectedTasks(selectedTasks.filter(t => t !== task));
+                                  }
+                                }}
+                                className="w-4 h-4"
+                              />
+                              <label htmlFor={`task-${index}`} className="text-sm cursor-pointer">
+                                {task}
+                              </label>
+                            </div>
+                          )) || [];
+                        })()}
+                      </div>
+                    </div>
+                  )}
+
+                  <Button 
+                    onClick={generateTest} 
+                    disabled={!selectedTopic || selectedTasks.length === 0}
+                    className="w-full"
+                  >
+                    <Icon name="FileText" size={16} className="mr-2" />
+                    Сформировать контрольную
+                  </Button>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle>Предпросмотр контрольной</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {generatedTest ? (
+                    <div>
+                      <pre className="whitespace-pre-wrap bg-gray-50 p-4 rounded-lg text-sm border">
+                        {generatedTest}
+                      </pre>
+                      <div className="mt-4 flex space-x-2">
+                        <Button 
+                          onClick={() => {
+                            const blob = new Blob([generatedTest], { type: 'text/plain;charset=utf-8' });
+                            const url = URL.createObjectURL(blob);
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.download = `Контрольная_${selectedSubject}_${selectedTopic}.txt`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            URL.revokeObjectURL(url);
+                          }}
+                          className="flex-1"
+                        >
+                          <Icon name="Download" size={16} className="mr-2" />
+                          Скачать
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          onClick={() => {setGeneratedTest(''); setSelectedTasks([]);}}
+                          className="flex-1"
+                        >
+                          <Icon name="RotateCcw" size={16} className="mr-2" />
+                          Очистить
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <Icon name="FileText" size={48} className="mx-auto text-gray-300 mb-4" />
+                      <p className="text-gray-500">Выберите тему и задания для создания контрольной</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           {/* Statistics */}
@@ -974,6 +1285,44 @@ const Index = () => {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Add Absence Dialog */}
+      <Dialog open={isAddAbsenceOpen} onOpenChange={setIsAddAbsenceOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Отметить пропуск</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="absenceType">Тип пропуска</Label>
+              <Select value={newAbsenceType} onValueChange={setNewAbsenceType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Н">Н - Неуважительный пропуск</SelectItem>
+                  <SelectItem value="УП">УП - Уважительный пропуск</SelectItem>
+                  <SelectItem value="Б">Б - Пропуск по болезни</SelectItem>
+                  <SelectItem value="С">С - Пропуск из-за соревнований</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="absenceReason">Причина (опционально)</Label>
+              <Textarea
+                id="absenceReason"
+                value={newAbsenceReason}
+                onChange={(e) => setNewAbsenceReason(e.target.value)}
+                placeholder="Опишите причину пропуска"
+              />
+            </div>
+            <Button onClick={addAbsence} className="w-full">
+              <Icon name="Calendar" size={16} className="mr-2" />
+              Отметить пропуск
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
