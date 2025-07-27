@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,10 +33,20 @@ interface GradeEntry {
 }
 
 const Index = () => {
+  // Load data from localStorage helper
+  const loadData = <T>(key: string, defaultValue: T): T => {
+    try {
+      const stored = localStorage.getItem(key);
+      return stored ? JSON.parse(stored) : defaultValue;
+    } catch {
+      return defaultValue;
+    }
+  };
+
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [selectedClass, setSelectedClass] = useState('9А');
+  const [activeTab, setActiveTab] = useState(() => loadData('teacherCabinet_activeTab', 'dashboard'));
+  const [selectedClass, setSelectedClass] = useState(() => loadData('teacherCabinet_selectedClass', '9А'));
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [isAddStudentOpen, setIsAddStudentOpen] = useState(false);
   const [isAddGradeOpen, setIsAddGradeOpen] = useState(false);
@@ -55,14 +65,14 @@ const Index = () => {
   const [newGradeType, setNewGradeType] = useState<'Домашняя работа' | 'Контрольная работа' | 'Самостоятельная работа'>('Домашняя работа');
 
   // Constructor states
-  const [selectedSubject, setSelectedSubject] = useState('Математика');
-  const [selectedTopic, setSelectedTopic] = useState('');
-  const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
-  const [generatedTest, setGeneratedTest] = useState<string>('');
+  const [selectedSubject, setSelectedSubject] = useState(() => loadData('teacherCabinet_selectedSubject', 'Математика'));
+  const [selectedTopic, setSelectedTopic] = useState(() => loadData('teacherCabinet_selectedTopic', ''));
+  const [selectedTasks, setSelectedTasks] = useState<string[]>(() => loadData('teacherCabinet_selectedTasks', []));
+  const [generatedTest, setGeneratedTest] = useState<string>(() => loadData('teacherCabinet_generatedTest', ''));
 
   // Mock data
   const classes = ['9А', '9Б', '10А', '10Б', '11А'];
-  const [students, setStudents] = useState<Student[]>([
+  const [students, setStudents] = useState<Student[]>(() => loadData('teacherCabinet_students', [
     {
       id: 1,
       name: 'Иванов Иван',
@@ -120,7 +130,36 @@ const Index = () => {
       isProblematic: false,
       notes: 'Отличник, активно участвует'
     }
-  ]);
+  ]));
+
+  // Save data to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('teacherCabinet_students', JSON.stringify(students));
+  }, [students]);
+
+  useEffect(() => {
+    localStorage.setItem('teacherCabinet_selectedClass', selectedClass);
+  }, [selectedClass]);
+
+  useEffect(() => {
+    localStorage.setItem('teacherCabinet_activeTab', activeTab);
+  }, [activeTab]);
+
+  useEffect(() => {
+    localStorage.setItem('teacherCabinet_selectedSubject', selectedSubject);
+  }, [selectedSubject]);
+
+  useEffect(() => {
+    localStorage.setItem('teacherCabinet_selectedTopic', selectedTopic);
+  }, [selectedTopic]);
+
+  useEffect(() => {
+    localStorage.setItem('teacherCabinet_selectedTasks', JSON.stringify(selectedTasks));
+  }, [selectedTasks]);
+
+  useEffect(() => {
+    localStorage.setItem('teacherCabinet_generatedTest', generatedTest);
+  }, [generatedTest]);
 
   const handleLogin = () => {
     if (password === '123456789') {
