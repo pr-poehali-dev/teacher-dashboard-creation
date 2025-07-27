@@ -32,16 +32,17 @@ interface GradeEntry {
   subject: string;
 }
 
+// Load data from localStorage helper
+const loadData = <T,>(key: string, defaultValue: T): T => {
+  try {
+    const stored = localStorage.getItem(key);
+    return stored ? JSON.parse(stored) : defaultValue;
+  } catch {
+    return defaultValue;
+  }
+};
+
 const Index = () => {
-  // Load data from localStorage helper
-  const loadData = <T>(key: string, defaultValue: T): T => {
-    try {
-      const stored = localStorage.getItem(key);
-      return stored ? JSON.parse(stored) : defaultValue;
-    } catch {
-      return defaultValue;
-    }
-  };
 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
